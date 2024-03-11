@@ -1,6 +1,6 @@
 #include "DFRobot_AHT20.h"
 DFRobot_AHT20 aht20;
-
+// Dan Pancamo V3
 
 
 #define hallSensorPin D2 // Digital pin connected to the hall sensor
