@@ -235,16 +235,7 @@ void sensorSetup() {
 
 }
 
-/*
-void temperature()
-{
-  if(aht20.startMeasurementReady(true))
-  {
-    Serial.println("temp = " + String (aht20.getTemperature_F()));
-    Serial.println("RH = " + String (aht20.getHumidity_RH()));
-  }
-}
-*/
+
 
 
 float logBatteryLevel() {
