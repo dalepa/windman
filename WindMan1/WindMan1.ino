@@ -258,7 +258,7 @@ float logBatteryLevel() {
   percentage = constrain(percentage, 0, 100);
 
 
-  toInflux(BoardId + ".battery.level value=" + String(voltage));
+  toInflux(BoardId + ".battery.level value=" + String(percentage));
   toInflux(BoardId + ".battery.voltage value=" + String(voltage));
 
 
@@ -267,23 +267,7 @@ float logBatteryLevel() {
 }
 
 
-/*
-void batterylevel()
-{
 
-  
-    float batteryLevel = getBatteryLevel();
-  Serial.print("Battery Level: ");
-  Serial.print(batteryLevel);
-  Serial.println("%");
-
-
-
-  toInflux(BoardId + ".batterylavel value=" + String(getBatteryLevel()));
-
-}
-
-  */
 
 
 
