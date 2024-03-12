@@ -1,6 +1,9 @@
 #include "DFRobot_AHT20.h"
 DFRobot_AHT20 aht20;
-// Dan Pancamo V3
+// AUthor: Dan Pancamo
+// Features
+//      1. Hall Sensor
+//      2. AHT20 Sensor
 
 //includes
 #include <WiFi.h>
