@@ -1,9 +1,6 @@
 #include "DFRobot_AHT20.h"
 DFRobot_AHT20 aht20;
-// AUthor: Dan Pancamo
-// Features
-//      1. Hall Sensor
-//      2. AHT20 Sensor
+// Dan Pancamo V3
 
 //includes
 #include <WiFi.h>
@@ -13,6 +10,9 @@ DFRobot_AHT20 aht20;
 #include <string.h>
 #include <Wire.h>
 
+//AS5600
+#include "AS5600.h"
+AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
@@ -20,6 +20,7 @@ String BoardId = "windman.ktxcypress-100";
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLogTime=millis();
+
 
 
 
@@ -184,7 +185,7 @@ void countRotation() {
   //Serial.print("windSpeed sample" );
 }
 
-void logWind() {
+void logWindSpeed() {
   if (millis() - lastTime >= sampleTime) {
     lastTime = millis();
     
@@ -208,6 +209,7 @@ void logWind() {
     toInflux(BoardId + ".wind.rps value=" + String(rps));
     toInflux(BoardId + ".wind.linearVelocity value=" + String(linearVelocity));
 
+    toInflux(BoardId + ".wind wind_speed=" + String(random(20))  );
 
 
 
@@ -249,7 +251,7 @@ float logBatteryLevel() {
   float percentage = map(voltage, 3.3, 0, 100, 0);
 
   // Constrain the percentage to be between 0 and 100
-  percentage = constrain(percentage, 0, 100);
+ // percentage = constrain(percentage, 0, 100);
 
 
   toInflux(BoardId + ".battery.level value=" + String(percentage));
@@ -262,9 +264,38 @@ float logBatteryLevel() {
 
 
 
+void setupAS5600()
+{
+  Wire.begin();
 
+  as5600.begin(4);  //  set direction pin.
+  as5600.setDirection(AS5600_CLOCK_WISE);  //  default, just be explicit.
+  int b = as5600.isConnected();
+  Serial.print("AS5600 Connect: ");
+  Serial.println(b);
 
+  Serial.print("ADDR: ");
+  Serial.println(as5600.getAddress());
 
+  as5600.setAddress(0x36);
+
+  Serial.print("ADDR: ");
+  Serial.println(as5600.getAddress());
+
+}
+
+void logWindDirection()
+{
+      line = String(BoardId + ".as5600.getAngularSpeed value=" + String(as5600.getAngularSpeed(AS5600_MODE_RPM)));
+      toInflux(line);
+
+      line = String(BoardId + ".as5600.degrees value=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES));
+      toInflux(line);
+
+      line = String(BoardId + ".wind wind_direction=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES) + ",wind_speed=" + String(random(30) ));
+      toInflux(line);
+
+}
 
 void logTemperature()
 {
@@ -302,6 +333,9 @@ void setup()
     //otaSetup();
 
     sensorSetup();
+
+    setupAS5600();
+
 }
 
 void loop() {
@@ -317,7 +351,9 @@ void loop() {
 
 logTemperature();
 logBatteryLevel();
-logWind();
+//logWindSpeed();
+logWindDirection();
+
 
 
 
