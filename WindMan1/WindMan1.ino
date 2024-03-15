@@ -284,7 +284,7 @@ void setupAS5600()
 
 }
 
-void logWindDirection()
+void logWind()
 {
       line = String(BoardId + ".as5600.getAngularSpeed value=" + String(as5600.getAngularSpeed(AS5600_MODE_RPM)));
       toInflux(line);
@@ -352,7 +352,7 @@ void loop() {
 logTemperature();
 logBatteryLevel();
 //logWindSpeed();
-logWindDirection();
+logWind();
 
 
 
