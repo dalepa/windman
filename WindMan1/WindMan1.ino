@@ -252,7 +252,7 @@ float logBatteryLevel() {
 
 
   // Map the voltage to a percentage (replace with your specific battery curve if known)
-  float percentage = mapFloat(voltage, 3.3, 1.0, 100, 0);
+  float percentage = mapFloat(voltage, 1.92, 1.1, 100, 0);
 
   // Constrain the percentage to be between 0 and 100
  // percentage = constrain(percentage, 0, 100);
