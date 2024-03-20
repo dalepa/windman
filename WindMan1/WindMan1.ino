@@ -28,7 +28,7 @@ uint64_t lastLogTime=millis();
 
 //DFRobot HALL sensor SEN0185
 #define hallSensorPin D2 // Digital pin connected to the hall sensor
-#define sampleTime 1000 // Sample time in milliseconds (1 second)
+#define sampleTime 5000 // Sample time in milliseconds (1 second)
 
 
 
@@ -185,7 +185,7 @@ void countRotation() {
   //Serial.print("windSpeed sample" );
 }
 
-void logWindSpeed() {
+float getWindSpeed() {
   if (millis() - lastTime >= sampleTime) {
     lastTime = millis();
     
@@ -196,7 +196,7 @@ void logWindSpeed() {
     //  * Circumference of the anemometer cups' rotation path (cm)
     //  * Number of magnet rotations per anemometer cup rotation
     const float circumference = 125; // Replace with your anemometer's circumference
-    const int magnetRotationsPerCupRotation = 1; // Replace with your sensor setup
+    const int magnetRotationsPerCupRotation = 4; // Replace with your sensor setup
 
     // Calculate linear velocity (m/s)
     float linearVelocity = rps * circumference * magnetRotationsPerCupRotation / 100; // Convert cm to meters
@@ -209,11 +209,13 @@ void logWindSpeed() {
     toInflux(BoardId + ".wind.rps value=" + String(rps));
     toInflux(BoardId + ".wind.linearVelocity value=" + String(linearVelocity));
 
-    toInflux(BoardId + ".wind wind_speed=" + String(random(20))  );
+    //toInflux(BoardId + ".wind wind_speed=" + String(random(20))  );
 
 
 
     rotations = 0; // Reset counter for next sample
+
+    return windSpeed;
   }
 }
 
@@ -296,7 +298,9 @@ void logWind()
       line = String(BoardId + ".as5600.degrees value=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES));
       toInflux(line);
 
-      line = String(BoardId + ".wind wind_direction=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES) + ",wind_speed=" + String(random(30) ));
+      float windspeed=getWindSpeed();
+
+      line = String(BoardId + ".wind wind_direction=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES) + ",wind_speed=" + String(windspeed));
       toInflux(line);
 
 }
@@ -355,7 +359,6 @@ void loop() {
 
 logTemperature();
 logBatteryLevel();
-//logWindSpeed();
 logWind();
 
 
