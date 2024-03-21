@@ -203,7 +203,7 @@ float getWindSpeed() {
   if (elapsed >= sampleTime) {
 
 
-    const int magnetRotationsPerCupRotation = 2; // Replace with your sensor setup
+    const int magnetRotationsPerCupRotation = 4; // Replace with your sensor setup
 
 /*
     Serial.println ("rotations=" + String(rotations));
