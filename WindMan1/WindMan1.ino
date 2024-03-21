@@ -203,7 +203,7 @@ float getWindSpeed() {
   if (elapsed >= sampleTime) {
 
 
-    const int magnetRotationsPerCupRotation = 1; // Replace with your sensor setup
+    const int magnetRotationsPerCupRotation = 2; // Replace with your sensor setup
 
 /*
     Serial.println ("rotations=" + String(rotations));
@@ -400,7 +400,7 @@ void loop() {
 
   logTemperature();
   //logBatteryLevel();
-  //logWind();
+  logWind();
 
 
   delay(5000);
