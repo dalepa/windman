@@ -189,17 +189,19 @@ float getWindSpeed() {
   if (millis() - lastTime >= sampleTime) {
     lastTime = millis();
     
+    const int magnetRotationsPerCupRotation = 4; // Replace with your sensor setup
+
     // Calculate revolutions per second (RPS)
-    float rps = (float)rotations / sampleTime * 1000; // Convert milliseconds to seconds
+    float rps = (float)((rotations/magnetRotationsPerCupRotation) / sampleTime) * 1000; // Convert milliseconds to seconds
 
     // Define factors based on your anemometer design
     //  * Circumference of the anemometer cups' rotation path (cm)
     //  * Number of magnet rotations per anemometer cup rotation
     const float circumference = 125; // Replace with your anemometer's circumference
-    const int magnetRotationsPerCupRotation = 4; // Replace with your sensor setup
+   
 
     // Calculate linear velocity (m/s)
-    float linearVelocity = rps * circumference * magnetRotationsPerCupRotation / 100; // Convert cm to meters
+    float linearVelocity = (rps * circumference)/100; // Convert cm to meters
 
     // Convert linear velocity to km/h for better readability
     float windSpeed = linearVelocity * 3.6; 
