@@ -16,7 +16,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
-String BoardId = "windman.ktxcypress-100";         
+String BoardId = "windman.ktxcypress-200";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLogTime=millis();
@@ -28,13 +28,13 @@ uint64_t lastLogTime=millis();
 
 //DFRobot HALL sensor SEN0185
 #define hallSensorPin D2 // Digital pin connected to the hall sensor
-#define sampleTime 5000 // Sample time in milliseconds (1 second)
+#define PI 3.14159  // Define pi constant
 
 
 
 volatile int rotations = 0; // Counter for rotations (volatile for interrupt safety)
-unsigned long lastTime = 0; // Milliseconds since last measurement
-
+unsigned long lastTime = millis(); // Milliseconds since last measurement
+unsigned long sampleTime = 5000;   // Sample time in milliseconds (1 second)
 
 const int batteryPin = A2; // Analog pin connected to the battery voltage
 
@@ -172,63 +172,87 @@ void toInflux (String line)
 
 
 
-
-
-
-
-
-
-
-
 void countRotation() {
   rotations++;
-  //Serial.print("windSpeed sample" );
+  
 }
 
+
+
+float calcLinearVelocityMph(float rps, float diameter_cm) {
+  // Calculate radius in meters
+  float radius_m = diameter_cm / 200.0;  // Convert cm to meters (divide by 100)
+
+  // Calculate circumference in meters
+  float circumference_m = PI * radius_m;
+
+  // Calculate linear velocity in meters per second
+  float velocity_m_s = circumference_m * rps;
+
+  // Convert meters per second to miles per hour
+  float velocity_mph = velocity_m_s * 2.23694;  // Conversion factor (m/s to mph)
+
+  return velocity_mph;
+}
+
+
 float getWindSpeed() {
-  if (millis() - lastTime >= sampleTime) {
-    lastTime = millis();
-    
-    const int magnetRotationsPerCupRotation = 4; // Replace with your sensor setup
+  
+  int  elapsed = millis() - lastTime;
+
+  if (elapsed >= sampleTime) {
+
+
+    const int magnetRotationsPerCupRotation = 1; // Replace with your sensor setup
+
+/*
+    Serial.println ("rotations=" + String(rotations));
+    Serial.println ("sampleTime=" + String(sampleTime));
+    Serial.println ("lastTime=" + String(lastTime));
+    Serial.println ("elapsed=" + String(elapsed));
+    Serial.println ("millis() - lastTime=" + String(millis() - lastTime));
+*/
 
     // Calculate revolutions per second (RPS)
-    float rps = (float)((rotations/magnetRotationsPerCupRotation) / sampleTime) * 1000; // Convert milliseconds to seconds
+    float rps =  (  (float)rotations / (elapsed / 1000) ); // Convert milliseconds to seconds
+
+    rps = rps / (float) magnetRotationsPerCupRotation;
 
     // Define factors based on your anemometer design
     //  * Circumference of the anemometer cups' rotation path (cm)
     //  * Number of magnet rotations per anemometer cup rotation
-    const float circumference = 125; // Replace with your anemometer's circumference
+    const float circumference = 86.7; // Replace with your anemometer's circumference
    
 
     // Calculate linear velocity (m/s)
-    float linearVelocity = (rps * circumference)/100; // Convert cm to meters
+    float linearVelocityMPH = calcLinearVelocityMph( rps, circumference);
 
-    // Convert linear velocity to km/h for better readability
-    float windSpeed = linearVelocity * 3.6; 
+    float windSpeed = linearVelocityMPH;
 
     // **Instead of printing here, store the value for later access**
     toInflux(BoardId + ".wind.mph value=" + String(windSpeed));
     toInflux(BoardId + ".wind.rps value=" + String(rps));
-    toInflux(BoardId + ".wind.linearVelocity value=" + String(linearVelocity));
-
-    //toInflux(BoardId + ".wind wind_speed=" + String(random(20))  );
-
-
+    toInflux(BoardId + ".wind.linearVelocity value=" + String(linearVelocityMPH));
 
     rotations = 0; // Reset counter for next sample
+    lastTime = millis();
 
     return windSpeed;
+
   }
+
 }
 
 
 
-void sensorSetup() {
+void setupHALL() {
   pinMode(hallSensorPin, INPUT);
-  pinMode(batteryPin, INPUT);
 
   attachInterrupt(digitalPinToInterrupt(hallSensorPin), countRotation, FALLING); // Interrupt on falling edge
 
+}
+
+void setupAHT20(){
 
     uint8_t status;
     while((status = aht20.begin()) != 0)
@@ -307,6 +331,15 @@ void logWind()
 
 }
 
+
+void logHallTest()
+{
+
+      float windspeed=getWindSpeed();
+
+}
+
+
 void logTemperature()
 {
 
@@ -333,18 +366,24 @@ void logTemperature()
 void setup() 
 {
 
-    Serial.begin(9600);
+    Serial.begin(115200);
 
 
     //WIFI SETUP  
     wifiSetup();
 
+    //Setup BatteryPin
+    pinMode(batteryPin, INPUT);
+
+
     //OTA Setup
     //otaSetup();
 
-    sensorSetup();
+    setupHALL();    //setup HALL Senseor
+    setupAHT20();  //setup TEMP sensor
 
-    setupAS5600();
+    //AS5600 Setup Magnet Sensor
+    //setupAS5600();
 
 }
 
@@ -359,16 +398,11 @@ void loop() {
   // if you want to print the wind speed at specific points
 
 
-logTemperature();
-logBatteryLevel();
-logWind();
+  logTemperature();
+  //logBatteryLevel();
+  //logWind();
 
 
-
-
-
-
-delay(1000);
-
+  delay(5000);
 
 }
