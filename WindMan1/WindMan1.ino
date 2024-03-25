@@ -16,12 +16,21 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
-String BoardId = "windman.ktxcypress-200";         
+String BoardId = "windman.ktxcypress-100";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLogTime=millis();
 
 
+
+// REED SWITCH
+const int switchPin = D6; // Replace with the actual switch pin on the IO Shield
+const int debounceTime = 50; // Debounce time in milliseconds (adjust as needed)
+
+volatile int stateChangeCount = 0; // Volatile for interrupt safety
+volatile int lastSwitchState = HIGH; // Initial state assumed HIGH (adjust if needed)
+volatile unsigned long lastStateChangeTime = 0; // Last time state change occurred (milliseconds)
+unsigned long lastRotationTime = 0;
 
 
 
@@ -34,7 +43,8 @@ uint64_t lastLogTime=millis();
 
 volatile int rotations = 0; // Counter for rotations (volatile for interrupt safety)
 unsigned long lastTime = millis(); // Milliseconds since last measurement
-unsigned long sampleTime = 5000;   // Sample time in milliseconds (1 second)
+
+unsigned long sampleTime = 1000;   // Sample time in milliseconds (1 second)
 
 const int batteryPin = A2; // Analog pin connected to the battery voltage
 
@@ -42,6 +52,9 @@ const int batteryPin = A2; // Analog pin connected to the battery voltage
 
 const char* ssid     = "cam24";
 const char* password = "olivia15";
+
+//const char* ssid     = "YoDaddy";
+//const char* password = "abcd1234";
 
 //UDP
 int port = 8089;
@@ -179,20 +192,27 @@ void countRotation() {
 
 
 
-float calcLinearVelocityMph(float rps, float diameter_cm) {
-  // Calculate radius in meters
-  float radius_m = diameter_cm / 200.0;  // Convert cm to meters (divide by 100)
 
-  // Calculate circumference in meters
-  float circumference_m = PI * radius_m;
+#define PI 3.14159  // Define pi for circumference calculation
 
-  // Calculate linear velocity in meters per second
-  float velocity_m_s = circumference_m * rps;
+float calculateWindSpeedMph(int circleDiameterMM, int rotations, float timeInterval) {
+  // Convert mm to meters
+  float circleDiameterM = circleDiameterMM / 1000.0;
 
-  // Convert meters per second to miles per hour
-  float velocity_mph = velocity_m_s * 2.23694;  // Conversion factor (m/s to mph)
+  // Distance traveled per cup per rotation depends on circle diameter
+  float circumference = PI * circleDiameterM;
+  float distancePerCup = circumference;
 
-  return velocity_mph;
+  // Total distance traveled is calculated based on a single cup (assuming all cups move together)
+  float totalDistance = distancePerCup * rotations;
+
+  // Calculate wind speed in meters per second
+  float windSpeedMps = totalDistance / timeInterval;
+
+  // Convert wind speed to miles per hour
+  float windSpeedMph = windSpeedMps * 2.23694;
+
+  return windSpeedMph;
 }
 
 
@@ -200,57 +220,43 @@ float getWindSpeed() {
   
   int  elapsed = millis() - lastTime;
 
-  if (elapsed >= sampleTime) {
+  //if (elapsed >= sampleTime) {
 
 
-    const int magnetRotationsPerCupRotation = 4; // Replace with your sensor setup
+   // Serial.println ("rotations=" + String(rotations));
+    //Serial.println ("elapsed=" + String(elapsed/1000));
+    Serial.println ("rotation/sec=" + String((float) rotations/(elapsed/1000)));
+  /*
 
-/*
-    Serial.println ("rotations=" + String(rotations));
     Serial.println ("sampleTime=" + String(sampleTime));
     Serial.println ("lastTime=" + String(lastTime));
     Serial.println ("elapsed=" + String(elapsed));
     Serial.println ("millis() - lastTime=" + String(millis() - lastTime));
 */
 
-    // Calculate revolutions per second (RPS)
-    float rps =  (  (float)rotations / (elapsed / 1000) ); // Convert milliseconds to seconds
 
-    rps = rps / (float) magnetRotationsPerCupRotation;
+    float windSpeed = calculateWindSpeedMph(275, rotations, elapsed/1000);
 
-    // Define factors based on your anemometer design
-    //  * Circumference of the anemometer cups' rotation path (cm)
-    //  * Number of magnet rotations per anemometer cup rotation
-    const float circumference = 86.7; // Replace with your anemometer's circumference
-   
-
-    // Calculate linear velocity (m/s)
-    float linearVelocityMPH = calcLinearVelocityMph( rps, circumference);
-
-    float windSpeed = linearVelocityMPH;
 
     // **Instead of printing here, store the value for later access**
-    toInflux(BoardId + ".wind.mph value=" + String(windSpeed));
-    toInflux(BoardId + ".wind.rps value=" + String(rps));
-    toInflux(BoardId + ".wind.linearVelocity value=" + String(linearVelocityMPH));
+  //  toInflux(BoardId + ".wind.mph value=" + String(windSpeed));
+  //  toInflux(BoardId + ".wind.rps value=" + String(rotations/(elapsed/1000)));
+  //   toInflux(BoardId + ".wind.linearVelocity value=" + String(windSpeed));
 
     rotations = 0; // Reset counter for next sample
     lastTime = millis();
 
     return windSpeed;
 
-  }
+ // }
 
 }
 
 
 
-void setupHALL() {
-  pinMode(hallSensorPin, INPUT);
 
-  attachInterrupt(digitalPinToInterrupt(hallSensorPin), countRotation, FALLING); // Interrupt on falling edge
 
-}
+
 
 void setupAHT20(){
 
@@ -332,13 +338,6 @@ void logWind()
 }
 
 
-void logHallTest()
-{
-
-      float windspeed=getWindSpeed();
-
-}
-
 
 void logTemperature()
 {
@@ -363,6 +362,42 @@ void logTemperature()
 
 
 
+
+void reedSwitchISR() {
+  unsigned long currentMillis = millis();
+
+  // Debounce: Ignore interrupts within debounceTime of the last change
+  if (currentMillis - lastStateChangeTime >= debounceTime) {
+    int newSwitchState = digitalRead(switchPin);
+    if (newSwitchState != lastSwitchState) {
+      // Only count transition from HIGH to LOW (magnet passing the reed switch)
+      if (lastSwitchState == HIGH && newSwitchState == LOW) {
+        stateChangeCount++;
+      }
+      lastSwitchState = newSwitchState;
+    }
+    lastStateChangeTime = currentMillis;
+  }
+}
+
+
+
+float rotationsPerSecond()
+{
+    int elapsed = millis() - lastRotationTime;
+
+    float  rotationPerInterval = (float) stateChangeCount/(float)elapsed * 1000.0;
+
+    stateChangeCount = 0;
+    lastRotationTime = millis();
+
+    return (rotationPerInterval);
+
+}
+
+
+
+
 void setup() 
 {
 
@@ -379,13 +414,19 @@ void setup()
     //OTA Setup
     //otaSetup();
 
-    setupHALL();    //setup HALL Senseor
     setupAHT20();  //setup TEMP sensor
 
     //AS5600 Setup Magnet Sensor
     //setupAS5600();
 
+    //SETUP REED SWITCH
+    pinMode(switchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
+    attachInterrupt(digitalPinToInterrupt(switchPin), reedSwitchISR, CHANGE); // Attach interrupt on change
+
 }
+
+
+
 
 void loop() {
 
@@ -398,11 +439,27 @@ void loop() {
   // if you want to print the wind speed at specific points
 
 
-  logTemperature();
-  //logBatteryLevel();
-  logWind();
+  int  elapsed = millis() - lastLogTime;
+
+  if (elapsed > 1000){
+    //logTemperature();
+    //logBatteryLevel();
+    //logWind();
 
 
-  delay(5000);
+    float rps = rotationsPerSecond();
+    Serial.println("rps=" + String (rps));
+
+    String line = String(BoardId + ".wind.rps value=" + rps);
+    toInflux(line);
+
+
+
+    lastLogTime = millis();
+    
+  }
+
+
+
 
 }
