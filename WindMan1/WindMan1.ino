@@ -16,7 +16,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
-String BoardId = "windman.ktxcypress-100";         
+String BoardId = "windman.ktxcypress-200";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
@@ -346,13 +346,13 @@ float readRead() {
 
 }
 
-
-float reedSample(int sampletime){
+// Count the Reveloutions per Seconds of the Magnet across the reed
+float reedRPS(){
 
 
   revs = readRead();
   
-
+  int sampletime = 1;    // Sample each X seconds
 
   int elapsed = millis() - reedLastTime;
 
@@ -406,25 +406,17 @@ void loop() {
   //webserver.handleClient();
 
 
-  // No rotation counting happens here, handled by the interrupt
-  // You can call displayWindSpeed() here or from other parts of your code
-  // if you want to print the wind speed at specific points
-
-
   int  elapsed = millis() - lastLoopTime;
 
-  float newrps = reedSample(1000);
+  float newrps = reedRPS();
 
 
   if (elapsed > 3000){
     logTemperature();
     logBatteryLevel();
-    logWind(newrps);
+    logWind(5);
     lastLoopTime = millis();
 
   }
-
-
-
 
 }
