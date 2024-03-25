@@ -300,10 +300,7 @@ void logWind(float rps)
 
       float windspeed=calculateWindSpeedMph(275,rps,1);
 
-      line = String(BoardId + ".wind wind_direction=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES) + ",wind_speed=" + String(windspeed));
-      toInflux(line);
-
-      line = String(BoardId + ".wind rps=" + String(rps));
+      line = String(BoardId + ".wind wind_direction=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES) + ",wind_speed=" + String(windspeed) + ",rps=" + String(rps));
       toInflux(line);
 
 }
