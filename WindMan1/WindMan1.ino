@@ -16,7 +16,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
-String BoardId = "windman.ktxcypress-200";         
+String BoardId = "windman.ktxcypress-100";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
@@ -29,8 +29,25 @@ int switchState;
 float revs = 0.0;
 unsigned long  reedLastTime = 0;
 int lastSwitchState = HIGH;
-int elapsed=0;
+//int elapsed=0;
 float rps = 0.0;
+
+//Bucket
+int bucketSwitchPin=D5;
+float tips = 0.0;
+unsigned long  bucketLastTipTime = 0;
+const int debounceTime = 500; // Debounce time in milliseconds (adjust as needed)
+
+/*
+int bucketSwitchPin=D5;
+int bucketSwitchState;
+float tips = 0.0;
+unsigned long  bucketLastTipTime = 0;
+int lastBucketSwitchState = HIGH;
+float tps = 0.0;  // number of tips per sample time
+*/
+
+
 
 
 //DFRobot HALL sensor SEN0185
@@ -367,6 +384,56 @@ float reedRPS(){
 }
 
 
+void tipping() {
+    if (millis() - bucketLastTipTime >= debounceTime) {
+      tips++;
+      bucketLastTipTime = millis();
+  }
+}
+
+
+/*
+float tipsRead() {
+  
+  bucketSwitchState = digitalRead(bucketSwitchPin);
+
+
+  if (bucketSwitchState == LOW && lastBucketSwitchState == HIGH ) {
+
+    //lastBucketSwitchState = bucketSwitchState;
+    Serial.printf("bucketSwitchState = %d\n", bucketSwitchState);
+    tips++;
+  }
+
+  lastBucketSwitchState = bucketSwitchState;
+  return (tips);
+
+}
+
+float bucketTips(){
+
+
+  tips = tipsRead();
+  
+  int sampletime = 5000;    // Sample each X seconds
+
+  int elapsed = millis() - bucketLastTipTime;
+
+  if (elapsed > sampletime) {
+    tps = (float) tips/((float)elapsed/1000.0);
+    bucketLastTipTime = millis();
+    tips=0;
+  }
+  return (tps);
+
+}
+
+
+*/
+
+float bucketTips(){
+  return(tips);
+}
 
 
 
@@ -395,6 +462,9 @@ void setup()
 
     //SETUP REED SWITCH
     pinMode(switchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
+    
+    pinMode(bucketSwitchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
+    attachInterrupt(digitalPinToInterrupt(bucketSwitchPin), tipping, FALLING); // Attach interrupt on falling edge
 
 }
 
@@ -406,11 +476,10 @@ void loop() {
 
   //webserver.handleClient();
 
-
   int  elapsed = millis() - lastLoopTime;
 
   float newrps = reedRPS();
-
+  float newtips = bucketTips();
 
   if (elapsed > 3000){
     logTemperature();
@@ -418,7 +487,8 @@ void loop() {
     logWind(newrps);
     lastLoopTime = millis();
 
-    
+    Serial.printf("Tips = %2.2f\n", newtips);   
+
 
   }
 
