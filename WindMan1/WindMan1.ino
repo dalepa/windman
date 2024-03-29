@@ -303,6 +303,7 @@ void logWind(float rps)
       line = String(BoardId + ".wind wind_direction=" + String(as5600.rawAngle() * AS5600_RAW_TO_DEGREES) + ",wind_speed=" + String(windspeed) + ",rps=" + String(rps));
       toInflux(line);
 
+
 }
 
 
@@ -352,7 +353,7 @@ float reedRPS(){
 
   revs = readRead();
   
-  int sampletime = 1;    // Sample each X seconds
+  int sampletime = 1000;    // Sample each X seconds
 
   int elapsed = millis() - reedLastTime;
 
@@ -414,8 +415,10 @@ void loop() {
   if (elapsed > 3000){
     logTemperature();
     logBatteryLevel();
-    logWind(5);
+    logWind(newrps);
     lastLoopTime = millis();
+
+    
 
   }
 
