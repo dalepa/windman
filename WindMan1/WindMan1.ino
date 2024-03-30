@@ -22,6 +22,7 @@ const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 uint64_t lastLoopTime=millis();
 
 
+#define PI 3.14159
 
 // REED SWITCH
 int switchPin=D6;
@@ -35,17 +36,14 @@ float rps = 0.0;
 //Bucket
 int bucketSwitchPin=D5;
 float tips = 0.0;
+float tipsLastMinute++;
+float tipsLastHour++; 
+float tipsLast24Hours++;
+
 unsigned long  bucketLastTipTime = 0;
 const int debounceTime = 500; // Debounce time in milliseconds (adjust as needed)
 
-/*
-int bucketSwitchPin=D5;
-int bucketSwitchState;
-float tips = 0.0;
-unsigned long  bucketLastTipTime = 0;
-int lastBucketSwitchState = HIGH;
-float tps = 0.0;  // number of tips per sample time
-*/
+
 
 
 
@@ -388,54 +386,42 @@ void tipping() {
     if (millis() - bucketLastTipTime >= debounceTime) {
       tips++;
       bucketLastTipTime = millis();
+      
+      tipsLastMinute++;
+      tipsLastHour++; 
+      tipsLast24Hours++;
   }
 }
 
 
-/*
-float tipsRead() {
-  
-  bucketSwitchState = digitalRead(bucketSwitchPin);
 
-
-  if (bucketSwitchState == LOW && lastBucketSwitchState == HIGH ) {
-
-    //lastBucketSwitchState = bucketSwitchState;
-    Serial.printf("bucketSwitchState = %d\n", bucketSwitchState);
-    tips++;
-  }
-
-  lastBucketSwitchState = bucketSwitchState;
-  return (tips);
-
-}
-
-float bucketTips(){
-
-
-  tips = tipsRead();
-  
-  int sampletime = 5000;    // Sample each X seconds
-
-  int elapsed = millis() - bucketLastTipTime;
-
-  if (elapsed > sampletime) {
-    tps = (float) tips/((float)elapsed/1000.0);
-    bucketLastTipTime = millis();
-    tips=0;
-  }
-  return (tps);
-
-}
-
-
-*/
 
 float bucketTips(){
   return(tips);
 }
 
 
+
+
+
+float calculateRainfall(float diameter_mm, float tips, float tip_volume_ml) {
+  // Convert diameter to cm
+  float diameter_cm = diameter_mm * (1.0 / 10.0);
+
+  // Calculate collector area in cm²
+  float collector_area = PI * pow(diameter_cm / 2.0, 2);
+
+  // Convert tip volume from ml to cm³ (corrected line)
+  float tip_volume_cm3 = tip_volume_ml * (1.0 / 1.0);
+
+  // Calculate total rainfall volume collected (cm³)
+  float rainfall_volume = tips * tip_volume_cm3;
+
+  // Convert rainfall volume from cm³ to mm (millimeters of rain)
+  float rainfall_mm = rainfall_volume / collector_area * 10;
+
+  return rainfall_mm / 25.4;
+}
 
 
 
@@ -468,7 +454,39 @@ void setup()
 
 }
 
+void logRain(int tips, int elapsed) {
 
+    
+    if (elapsed > 60){
+      tipsLastMinute = 0;
+    }
+    if (elapsed > 60*60){
+      tipsLastHour = 0;
+    }
+    if (elapsed > 60*60*24){
+      tipsLast24Hours = 0;
+    }
+
+
+    int diameter = 160;
+    float bucketsize=3.3;
+
+    rainfall = calculateRainfall(diameter,tipsLastMinute,bucketsize)
+    line = String(BoardId + ".rain.lastminute value=" + String(rainfall));
+    toInflux(line);
+
+    rainfall = calculateRainfall(diameter,tipsLastHour,bucketsize)
+    line = String(BoardId + ".rain.lasthour value=" + String(rainfall));
+    toInflux(line);
+
+    rainfall = calculateRainfall(diameter,tipsLast24Hours,bucketsize)
+    line = String(BoardId + ".rain.last24hours value=" + String(rainfall));
+    toInflux(line);
+
+    line = String(BoardId + ".rain.tips value=" + String(tips));
+    toInflux(line);
+
+}
 
 
 void loop() {
@@ -485,10 +503,10 @@ void loop() {
     logTemperature();
     logBatteryLevel();
     logWind(newrps);
+    logRain(newtips,elapsed/1000);
+
     lastLoopTime = millis();
-
-    Serial.printf("Tips = %2.2f\n", newtips);   
-
+    
 
   }
 
