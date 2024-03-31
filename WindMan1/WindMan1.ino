@@ -1,6 +1,11 @@
 #include "DFRobot_AHT20.h"
 DFRobot_AHT20 aht20;
-// Dan Pancamo V3
+// Dan Pancamo V5
+// adding pressure DFRobot_ICP10111
+
+
+#include <DFRobot_ICP10111.h>
+DFRobot_ICP10111 icp;
 
 //includes
 #include <WiFi.h>
@@ -16,7 +21,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
-String BoardId = "windman.ktxcypress-100";         
+String BoardId = "windman.ktxcypress-300";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
@@ -36,13 +41,16 @@ float rps = 0.0;
 //Bucket
 int bucketSwitchPin=D5;
 float tips = 0.0;
-float tipsLastMinute++;
-float tipsLastHour++; 
-float tipsLast24Hours++;
+float tipsLastMinute=0;
+float tipsLastHour=0; 
+float tipsLast24Hours=0;
 
 unsigned long  bucketLastTipTime = 0;
-const int debounceTime = 500; // Debounce time in milliseconds (adjust as needed)
+const int debounceTime = 600; // Debounce time in milliseconds (adjust as needed)
 
+int tipsLastMinuteTimer =0;
+int tipsLastLastHourTimer =0;
+int tipsLastLast24HourTimer =0;
 
 
 
@@ -205,10 +213,24 @@ void countRotation() {
 
 
 
+void setupICP(){
 
+    while(icp.begin() != 0){
+      Serial.println("Failed to initialize the sensor");
+      }
+     Serial.println("Success to initialize the sensor");
+     /**
+      * @brief Set work mode
+      * |------------------|-----------|-------------------|----------------------|
+      * |       api        |   mode    |Conversion Time(ms)|Pressure RMS Noise(Pa)|
+      * |icp.eLowPower     |  Low Power   |      1.8          |        3.2           |
+      * |icp.eNormal       |  Normal      |      6.3          |        1.6           |
+      * |icp.eLowNoise     |  Low Noise   |      23.8         |        0.8           |
+      * |icp.eUltraLowNoise|  Ultra-low Noise |      94.5         |        0.4           |
+      */
+     icp.setWorkPattern(icp.eNormal);
 
-
-
+}
 
 
 
@@ -443,6 +465,9 @@ void setup()
 
     setupAHT20();  //setup TEMP sensor
 
+    //setup Pressure Sensor
+    setupICP();
+
     //AS5600 Setup Magnet Sensor
     setupAS5600();
 
@@ -454,32 +479,71 @@ void setup()
 
 }
 
+void logICP(){
+
+
+  line = String(BoardId + ".icp.temperature value=" + String((icp.getTemperature() * 9/5) + 32));
+  toInflux(line);
+
+  line = String(BoardId + ".icp.airpressure value=" + String(icp.getAirPressure()/100));
+  toInflux(line);
+
+  line = String(BoardId + ".icp.altitude value=" + String(icp.getElevation() * 3.28084));
+  toInflux(line);
+
+
+/*
+    Serial.println("------------------------------");
+  Serial.print("Read air pressure:");
+  Serial.print(icp.getAirPressure()/100);
+  Serial.println("mb");
+  Serial.print("Read temperature:");
+  Serial.print((icp.getTemperature() * 9/5) + 32);
+  Serial.println("F");
+  Serial.print("Read altitude:");
+  Serial.print(icp.getElevation() * 3.28084);
+  Serial.println("ft");
+*/
+
+}
+
 void logRain(int tips, int elapsed) {
-
-    
-    if (elapsed > 60){
-      tipsLastMinute = 0;
-    }
-    if (elapsed > 60*60){
-      tipsLastHour = 0;
-    }
-    if (elapsed > 60*60*24){
-      tipsLast24Hours = 0;
-    }
-
 
     int diameter = 160;
     float bucketsize=3.3;
+    float rainfall;
 
-    rainfall = calculateRainfall(diameter,tipsLastMinute,bucketsize)
+    tipsLastMinuteTimer += elapsed;
+    tipsLastLastHourTimer += elapsed;
+    tipsLastLast24HourTimer += elapsed;
+
+    if (tipsLastMinuteTimer > 60){
+      tipsLastMinute = 0;
+      tipsLastMinuteTimer = 0;
+    }
+    if (tipsLastLastHourTimer > 60*60){
+      tipsLastHour = 0;
+      tipsLastLastHourTimer = 0;
+    }
+    if (tipsLastLast24HourTimer > 60*60*24){
+      tipsLast24Hours = 0;
+      tipsLastLast24HourTimer=0;
+    }
+
+
+    Serial.printf("elapsed = %d\n", elapsed);   
+
+   
+
+    rainfall = calculateRainfall(diameter,tipsLastMinute,bucketsize);
     line = String(BoardId + ".rain.lastminute value=" + String(rainfall));
     toInflux(line);
 
-    rainfall = calculateRainfall(diameter,tipsLastHour,bucketsize)
+    rainfall = calculateRainfall(diameter,tipsLastHour,bucketsize);
     line = String(BoardId + ".rain.lasthour value=" + String(rainfall));
     toInflux(line);
 
-    rainfall = calculateRainfall(diameter,tipsLast24Hours,bucketsize)
+    rainfall = calculateRainfall(diameter,tipsLast24Hours,bucketsize);
     line = String(BoardId + ".rain.last24hours value=" + String(rainfall));
     toInflux(line);
 
@@ -501,6 +565,7 @@ void loop() {
 
   if (elapsed > 3000){
     logTemperature();
+    logICP();
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
