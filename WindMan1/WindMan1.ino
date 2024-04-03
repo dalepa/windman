@@ -253,6 +253,8 @@ void setupAHT20(){
 
 float mapFloat(float x, float in_min, float in_max, float out_min, float out_max) {
   return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+  // 
+  //  (X - 1.5) * (100-0) / (1.9-1.5) + 0 
 }
 
 
@@ -265,7 +267,7 @@ float logBatteryLevel() {
 
 
   // Map the voltage to a percentage (replace with your specific battery curve if known)
-  float percentage = mapFloat(voltage, 3.7, 1.9, 100, 0);
+  float percentage = mapFloat(voltage, 1.5, 1.9, 0, 100);
 
   // Constrain the percentage to be between 0 and 100
  // percentage = constrain(percentage, 0, 100);
