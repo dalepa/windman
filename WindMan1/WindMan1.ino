@@ -2,6 +2,7 @@
 DFRobot_AHT20 aht20;
 // Dan Pancamo V5
 // adding pressure DFRobot_ICP10111
+//Added OTA
 
 
 #include <DFRobot_ICP10111.h>
@@ -20,8 +21,8 @@ DFRobot_ICP10111 icp;
 AS5600L as5600;   //  use default Wire
 
 
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield";                       // Version 
-String BoardId = "windman.ktxcypress-300";         
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield V2";                       // Version 
+String BoardId = "windman.ktxcypress-400";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
@@ -181,10 +182,12 @@ void handle_OnConnect()
   webserver.send(200, "text/plain", "Hello from " + Version + " " + BoardId);
 }
 
+
 void otaSetup()
 {
   webserver.on("/", handle_OnConnect);
   ElegantOTA.begin(&webserver);    // Start ElegantOTA
+  ElegantOTA. setAutoReboot(true);
   webserver.begin();
 }
 
@@ -463,7 +466,7 @@ void setup()
 
 
     //OTA Setup
-    //otaSetup();
+    otaSetup();
 
     setupAHT20();  //setup TEMP sensor
 
@@ -473,15 +476,17 @@ void setup()
     //AS5600 Setup Magnet Sensor
     setupAS5600();
 
-    //SETUP REED SWITCH
+    //SETUP REED CUPS SWITCH
     pinMode(switchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
     
+    //SETUP RAIN SWITCH
     pinMode(bucketSwitchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
     attachInterrupt(digitalPinToInterrupt(bucketSwitchPin), tipping, FALLING); // Attach interrupt on falling edge
 
+
 }
 
-void logICP(){
+void logICPressure(){
 
 
   line = String(BoardId + ".icp.temperature value=" + String((icp.getTemperature() * 9/5) + 32));
@@ -554,11 +559,17 @@ void logRain(int tips, int elapsed) {
 
 }
 
+void OTAloop(){
+
+     //OTA
+    webserver.handleClient();
+    ElegantOTA.loop();
+}
 
 void loop() {
 
 
-  //webserver.handleClient();
+  OTAloop();
 
   int  elapsed = millis() - lastLoopTime;
 
@@ -566,8 +577,10 @@ void loop() {
   float newtips = bucketTips();
 
   if (elapsed > 3000){
+
+    
     logTemperature();
-    //logICP();
+    //logICPressure();
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
