@@ -21,16 +21,16 @@ DFRobot_ICP10111 icp;
 AS5600L as5600;   //  use default Wire
 
 
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040401";                       // Version 
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040403";                       // Version 
 String BoardId = "windman.ktxcypress-200";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
 
 
-//BATTERY CALC
+//BATTERY CALC  SCALE over time.
 float highestVoltage=0;
-float lowestVoltage=0;
+float lowestVoltage=100;
 
 #define PI 3.14159
 
@@ -591,7 +591,7 @@ void loop() {
   float newrps = reedRPS();
   float newtips = bucketTips();
 
-  if (elapsed > 3000){
+  if (elapsed > 5000){
 
     
     logTemperature();
