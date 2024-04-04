@@ -21,12 +21,16 @@ DFRobot_ICP10111 icp;
 AS5600L as5600;   //  use default Wire
 
 
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield V2";                       // Version 
-String BoardId = "windman.ktxcypress-400";         
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040401";                       // Version 
+String BoardId = "windman.ktxcypress-200";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
 
+
+//BATTERY CALC
+float highestVoltage=0;
+float lowestVoltage=0;
 
 #define PI 3.14159
 
@@ -72,11 +76,11 @@ const int batteryPin = A2; // Analog pin connected to the battery voltage
 
 //MY WIFI
 
-//const char* ssid     = "cam24";
-//const char* password = "olivia15";
+const char* ssid     = "cam24";
+const char* password = "olivia15";
 
-const char* ssid     = "YoDaddy";
-const char* password = "abcd1234";
+//const char* ssid     = "YoDaddy";
+//const char* password = "abcd1234";
 
 //UDP
 int port = 8089;
@@ -218,8 +222,14 @@ void countRotation() {
 
 void setupICP(){
 
+    int failCnt=0;
+
     while(icp.begin() != 0){
-      Serial.println("Failed to initialize the sensor");
+      Serial.println("ICP Failed to initialize the pressure sensor");
+      delay(1000);
+      failCnt++;
+      if (failCnt > 5) {break;}
+
       }
      Serial.println("Success to initialize the sensor");
      /**
@@ -243,11 +253,14 @@ void setupICP(){
 void setupAHT20(){
 
     uint8_t status;
+    int failCnt=0;
     while((status = aht20.begin()) != 0)
     {
       Serial.print("AHT20 sensor initialization failed. error status : ");
       Serial.println(status);
       delay(1000);
+      failCnt++;
+      if (failCnt > 5) {break;}
     }
 
 
@@ -268,12 +281,14 @@ float logBatteryLevel() {
 
   Serial.println("Voltage=" + String(voltage));
 
+  if (voltage > highestVoltage) {highestVoltage=voltage;}
+  if (voltage < lowestVoltage) {lowestVoltage=voltage;}
 
   // Map the voltage to a percentage (replace with your specific battery curve if known)
-  float percentage = mapFloat(voltage, 1.5, 1.9, 0, 100);
+  float percentage = mapFloat(voltage, lowestVoltage, highestVoltage, 0, 100);
 
   // Constrain the percentage to be between 0 and 100
- // percentage = constrain(percentage, 0, 100);
+  // percentage = constrain(percentage, 0, 100);
 
 
   toInflux(BoardId + ".battery.level value=" + String(percentage));
@@ -471,7 +486,7 @@ void setup()
     setupAHT20();  //setup TEMP sensor
 
     //setup Pressure Sensor
-    //setupICP();
+    setupICP();
 
     //AS5600 Setup Magnet Sensor
     setupAS5600();
@@ -580,7 +595,7 @@ void loop() {
 
     
     logTemperature();
-    //logICPressure();
+    logICPressure();
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
