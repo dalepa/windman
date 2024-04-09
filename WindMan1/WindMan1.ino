@@ -22,7 +22,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040403";                       // Version 
-String BoardId = "windman.ktxcypress-200";         
+String BoardId = "windman.ktxcypress-300";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
@@ -486,7 +486,7 @@ void setup()
     setupAHT20();  //setup TEMP sensor
 
     //setup Pressure Sensor
-    setupICP();
+    //setupICP();
 
     //AS5600 Setup Magnet Sensor
     setupAS5600();
@@ -595,7 +595,7 @@ void loop() {
 
     
     logTemperature();
-    logICPressure();
+    //logICPressure();
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
