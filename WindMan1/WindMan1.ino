@@ -22,7 +22,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040403";                       // Version 
-String BoardId = "windman.ktxcypress-300";         
+String BoardId = "windman.ktxcypress-200";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
