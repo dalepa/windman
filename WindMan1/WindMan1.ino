@@ -4,6 +4,23 @@ DFRobot_AHT20 aht20;
 // adding pressure DFRobot_ICP10111
 //Added OTA
 
+#include "Arduino.h"
+
+//BME680
+#include "bme68xLibrary.h"
+
+#ifndef PIN_CS
+#define PIN_CS 15
+#endif
+
+#ifndef ADD_I2C
+#define ADD_I2C 0x77
+#endif
+
+Bme68x bme;
+
+
+
 
 //ICP10111 Air Pressure
 #include <DFRobot_ICP10111.h>
@@ -24,7 +41,7 @@ int ICPstatus=0;
 AS5600L as5600;   //  use default Wire
 
 
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040403";                       // Version 
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 20240414";                       // Version 
 String BoardId = "windman.ktxcypress-300";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
@@ -510,6 +527,75 @@ float calculateRainfall(float diameter_mm, float tips, float tip_volume_ml) {
 }
 
 
+void setupBME680()
+{
+  Wire.begin();     //I2C mode
+	//SPI.begin();    //SPI mode
+	
+	while (!Serial)
+		delay(10);
+		
+	/* initializes the sensor based on SPI library */
+	//bme.begin(PIN_CS, SPI);     //SPI mode
+  bme.begin(ADD_I2C, Wire);     //I2C mode
+
+	if(bme.checkStatus())
+	{
+		if (bme.checkStatus() == BME68X_ERROR)
+		{
+			Serial.println("Sensor error:" + bme.statusString());
+			return;
+		}
+		else if (bme.checkStatus() == BME68X_WARNING)
+		{
+			Serial.println("Sensor Warning:" + bme.statusString());
+		}
+	}
+	
+	/* Set the default configuration for temperature, pressure and humidity */
+	bme.setTPH();
+
+	/* Set the heater configuration to 300 deg C for 100ms for Forced mode */
+	bme.setHeaterProf(300, 100);
+
+	//Serial.println("TimeStamp(ms), Temperature(deg C), Pressure(Pa), Humidity(%), Gas resistance(ohm), Status");
+}
+
+void logBME680(void)
+{
+	bme68xData data;
+
+	bme.setOpMode(BME68X_FORCED_MODE);
+	//delay(500+bme.getMeasDur()/200);
+
+	if (bme.fetchData())
+	{
+		bme.getData(data);
+
+      line = String(BoardId + ".bme680.temperature value=" + String((data.temperature * 9/5) + 32));
+      toInflux(line);
+      line = String(BoardId + ".bme680.humidity value=" + String(data.humidity));
+      toInflux(line);
+      line = String(BoardId + ".bme680.pressure value=" + String(data.pressure));
+      toInflux(line);
+      line = String(BoardId + ".bme680.gas value=" + String(data.gas_resistance));
+      toInflux(line);
+      
+
+
+/*
+		Serial.print(String(millis()) + ", ");
+		Serial.print(String(data.temperature * 9/5 + 32) + ", ");
+		Serial.print(String(data.pressure) + ", ");
+		Serial.print(String(data.humidity) + ", ");
+		Serial.print(String(data.gas_resistance) + ", ");
+		Serial.println(data.status, HEX);
+*/	
+  
+  }
+}
+
+
 
 void setup() 
 {
@@ -527,10 +613,14 @@ void setup()
     //OTA Setup
     otaSetup();
 
-    setupAHT20();  //setup TEMP sensor
+
+    setupBME680();  // BME680  temp-hum-press-air
+
+
+    //setupAHT20();  //setup TEMP sensor
 
     //setup Pressure Sensor
-    setupICP();
+    //setupICP();
 
     //AS5600 Setup Magnet Sensor
     setupAS5600();
@@ -609,11 +699,14 @@ void loop() {
   float newrps = reedRPS();
   float newtips = bucketTips();
 
-  if (elapsed > 2000){
+  if (elapsed > 3000){
 
     
-    logTemperature();
-    logICPressure();
+    //logTemperature();
+    //logICPressure();
+
+    logBME680();
+    
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
