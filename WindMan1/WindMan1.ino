@@ -5,8 +5,11 @@ DFRobot_AHT20 aht20;
 //Added OTA
 
 
+//ICP10111 Air Pressure
 #include <DFRobot_ICP10111.h>
 DFRobot_ICP10111 icp;
+int ICPstatus=0;
+
 
 //includes
 #include <WiFi.h>
@@ -22,7 +25,7 @@ AS5600L as5600;   //  use default Wire
 
 
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 2024040403";                       // Version 
-String BoardId = "windman.ktxcypress-200";         
+String BoardId = "windman.ktxcypress-300";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
@@ -51,7 +54,7 @@ float tipsLastHour=0;
 float tipsLast24Hours=0;
 
 unsigned long  bucketLastTipTime = 0;
-const int debounceTime = 600; // Debounce time in milliseconds (adjust as needed)
+const int debounceTime = 500; // Debounce time in milliseconds (adjust as needed)
 
 int tipsLastMinuteTimer =0;
 int tipsLastLastHourTimer =0;
@@ -218,6 +221,34 @@ void countRotation() {
   
 }
 
+void logICPressure(){
+
+    if (ICPstatus == 1) {
+      line = String(BoardId + ".icp.temperature value=" + String((icp.getTemperature() * 9/5) + 32));
+      toInflux(line);
+
+      line = String(BoardId + ".icp.airpressure value=" + String(icp.getAirPressure()/100));
+      toInflux(line);
+
+      line = String(BoardId + ".icp.altitude value=" + String(icp.getElevation() * 3.28084));
+      toInflux(line);
+    }
+
+
+      /*
+          Serial.println("------------------------------");
+        Serial.print("Read air pressure:");
+        Serial.print(icp.getAirPressure()/100);
+        Serial.println("mb");
+        Serial.print("Read temperature:");
+        Serial.print((icp.getTemperature() * 9/5) + 32);
+        Serial.println("F");
+        Serial.print("Read altitude:");
+        Serial.print(icp.getElevation() * 3.28084);
+        Serial.println("ft");
+      */
+
+}
 
 
 void setupICP(){
@@ -225,13 +256,25 @@ void setupICP(){
     int failCnt=0;
 
     while(icp.begin() != 0){
-      Serial.println("ICP Failed to initialize the pressure sensor");
-      delay(1000);
+      
+      Serial.println("setupICP Failed to initialize the ICP pressure sensor.  Retrying...");
+      delay(500);
       failCnt++;
-      if (failCnt > 5) {break;}
+      if (failCnt > 3) { break;}
 
       }
-     Serial.println("Success to initialize the sensor");
+
+    if (icp.begin() != 0) {
+          Serial.println("setupICP FAILED to initialize the pressure sensor");
+          ICPstatus = 0;
+    }
+    else{
+      ICPstatus = 1;
+      Serial.println("setupICP SUCCESS to initialize the pressure sensor");
+    }
+
+    delay(500);
+    
      /**
       * @brief Set work mode
       * |------------------|-----------|-------------------|----------------------|
@@ -258,9 +301,9 @@ void setupAHT20(){
     {
       Serial.print("AHT20 sensor initialization failed. error status : ");
       Serial.println(status);
-      delay(1000);
+      delay(500);
       failCnt++;
-      if (failCnt > 5) {break;}
+      if (failCnt > 3) {break;}
     }
 
 
@@ -308,15 +351,15 @@ void setupAS5600()
   as5600.begin(4);  //  set direction pin.
   as5600.setDirection(AS5600_CLOCK_WISE);  //  default, just be explicit.
   int b = as5600.isConnected();
-  Serial.print("AS5600 Connect: ");
+  Serial.print("AS5600 Connect Code: ");
   Serial.println(b);
 
-  Serial.print("ADDR: ");
+  Serial.print("Current AS5600 ADDR: ");
   Serial.println(as5600.getAddress());
 
   as5600.setAddress(0x36);
 
-  Serial.print("ADDR: ");
+  Serial.print("New AS5600 ADDR: ");
   Serial.println(as5600.getAddress());
 
 }
@@ -410,7 +453,7 @@ float reedRPS(){
 
   revs = readRead();
   
-  int sampletime = 1000;    // Sample each X seconds
+  int sampletime = 1000;    // Sample each X milliseconds
 
   int elapsed = millis() - reedLastTime;
 
@@ -432,6 +475,7 @@ void tipping() {
       tipsLastMinute++;
       tipsLastHour++; 
       tipsLast24Hours++;
+      //Serial.println("TIP");
   }
 }
 
@@ -486,7 +530,7 @@ void setup()
     setupAHT20();  //setup TEMP sensor
 
     //setup Pressure Sensor
-    //setupICP();
+    setupICP();
 
     //AS5600 Setup Magnet Sensor
     setupAS5600();
@@ -501,33 +545,7 @@ void setup()
 
 }
 
-void logICPressure(){
 
-
-  line = String(BoardId + ".icp.temperature value=" + String((icp.getTemperature() * 9/5) + 32));
-  toInflux(line);
-
-  line = String(BoardId + ".icp.airpressure value=" + String(icp.getAirPressure()/100));
-  toInflux(line);
-
-  line = String(BoardId + ".icp.altitude value=" + String(icp.getElevation() * 3.28084));
-  toInflux(line);
-
-
-/*
-    Serial.println("------------------------------");
-  Serial.print("Read air pressure:");
-  Serial.print(icp.getAirPressure()/100);
-  Serial.println("mb");
-  Serial.print("Read temperature:");
-  Serial.print((icp.getTemperature() * 9/5) + 32);
-  Serial.println("F");
-  Serial.print("Read altitude:");
-  Serial.print(icp.getElevation() * 3.28084);
-  Serial.println("ft");
-*/
-
-}
 
 void logRain(int tips, int elapsed) {
 
@@ -591,11 +609,11 @@ void loop() {
   float newrps = reedRPS();
   float newtips = bucketTips();
 
-  if (elapsed > 5000){
+  if (elapsed > 2000){
 
     
     logTemperature();
-    //logICPressure();
+    logICPressure();
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
