@@ -20,6 +20,15 @@ DFRobot_AHT20 aht20;
 Bme68x bme;
 
 
+//LTR390
+#include <Wire.h>
+#include <LTR390.h>
+
+#define LTR_I2C_ADDRESS 0x53
+LTR390 ltr390(LTR_I2C_ADDRESS);
+
+
+
 
 
 //ICP10111 Air Pressure
@@ -41,7 +50,7 @@ int ICPstatus=0;
 AS5600L as5600;   //  use default Wire
 
 
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery5000mah 20240414";                       // Version 
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery3500mah 20240415 LTR380-BME680-AS5600";                       // Version 
 String BoardId = "windman.ktxcypress-300";         
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
@@ -339,7 +348,7 @@ float logBatteryLevel() {
   // Read the battery voltage (assuming a 3.7V LiPo battery)
   float voltage = analogRead(batteryPin) * (3.3 / 4095.0);  
 
-  Serial.println("Voltage=" + String(voltage));
+  //Serial.println("Voltage=" + String(voltage));
 
   if (voltage > highestVoltage) {highestVoltage=voltage;}
   if (voltage < lowestVoltage) {lowestVoltage=voltage;}
@@ -595,6 +604,70 @@ void logBME680(void)
   }
 }
 
+void setupLTR390() {
+
+  Wire.begin();
+  if(!ltr390.init()){
+    Serial.println("LTR390 not connected!");
+  }
+
+  ltr390.setMode(LTR390_MODE_ALS);
+
+  ltr390.setGain(LTR390_GAIN_3);
+  Serial.print("LTR390 Gain : ");
+  switch (ltr390.getGain()) {
+    case LTR390_GAIN_1: Serial.println(1); break;
+    case LTR390_GAIN_3: Serial.println(3); break;
+    case LTR390_GAIN_6: Serial.println(6); break;
+    case LTR390_GAIN_9: Serial.println(9); break;
+    case LTR390_GAIN_18: Serial.println(18); break;
+  }
+  
+  ltr390.setResolution(LTR390_RESOLUTION_18BIT);
+  Serial.print("LTR390 Resolution : ");
+  switch (ltr390.getResolution()) {
+    case LTR390_RESOLUTION_13BIT: Serial.println(13); break;
+    case LTR390_RESOLUTION_16BIT: Serial.println(16); break;
+    case LTR390_RESOLUTION_17BIT: Serial.println(17); break;
+    case LTR390_RESOLUTION_18BIT: Serial.println(18); break;
+    case LTR390_RESOLUTION_19BIT: Serial.println(19); break;
+    case LTR390_RESOLUTION_20BIT: Serial.println(20); break;
+  }
+
+  //ltr390.setThresholds(100, 1000);
+  //ltr390.configInterrupt(true, LTR390_MODE_UVS);
+
+}
+
+
+void logLTR390() {
+  if (ltr390.newDataAvailable()) {
+      if (ltr390.getMode() == LTR390_MODE_ALS) {
+        line = String(BoardId + ".ltr380.lux value=" + String(ltr390.getLux()) );
+        toInflux(line);
+
+
+        //Serial.print("Ambient Light Lux: "); 
+        // Serial.println(ltr390.getLux());
+         ltr390.setGain(LTR390_GAIN_18);                  //Recommended for UVI - x18
+         ltr390.setResolution(LTR390_RESOLUTION_20BIT);   //Recommended for UVI - 20-bit
+         ltr390.setMode(LTR390_MODE_UVS); 
+
+      } else if (ltr390.getMode() == LTR390_MODE_UVS) {
+
+        line = String(BoardId + ".ltr380.uvi value=" + String(ltr390.getUVI()) );
+        toInflux(line);
+
+         //Serial.print("UV Index: "); 
+         //Serial.println(ltr390.getUVI());
+         
+         ltr390.setGain(LTR390_GAIN_3);                   //Recommended for Lux - x3
+         ltr390.setResolution(LTR390_RESOLUTION_18BIT);   //Recommended for Lux - 18-bit
+         ltr390.setMode(LTR390_MODE_ALS);
+      }
+  }
+}
+
 
 
 void setup() 
@@ -616,6 +689,7 @@ void setup()
 
     setupBME680();  // BME680  temp-hum-press-air
 
+    setupLTR390();  //LTR390 light and UV
 
     //setupAHT20();  //setup TEMP sensor
 
@@ -661,7 +735,7 @@ void logRain(int tips, int elapsed) {
     }
 
 
-    Serial.printf("elapsed = %d\n", elapsed);   
+    //Serial.printf("elapsed = %d\n", elapsed);   
 
    
 
@@ -706,7 +780,7 @@ void loop() {
     //logICPressure();
 
     logBME680();
-    
+    logLTR390();
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
