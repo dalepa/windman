@@ -1,8 +1,24 @@
+// Dan Pancamo V5
+// 
+// Latest:  Adding NVS to store highest and lowest batterylevel after boot
+
+
+
+//LED
+#include <FastLED.h>
+#define NUM_LEDS 1     //Number of RGB LED beads
+#define DATA_PIN D8    //The pin for controlling RGB LED
+#define LED_TYPE NEOPIXEL    //RGB LED strip type
+CRGB leds[NUM_LEDS];    //Instantiate RGB LED
+
+
+
+#include <esp_err.h>
+#include <nvs_flash.h>
+
 #include "DFRobot_AHT20.h"
 DFRobot_AHT20 aht20;
-// Dan Pancamo V5
-// adding pressure DFRobot_ICP10111
-//Added OTA
+
 
 #include "Arduino.h"
 
@@ -48,20 +64,31 @@ int ICPstatus=0;
 //AS5600
 #include "AS5600.h"
 AS5600L as5600;   //  use default Wire
-
-
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Battery3500mah 20240415 LTR380-BME680-AS5600";                       // Version 
-String BoardId = "windman.ktxcypress-300";         
+      
 const uint64_t sleepTime = 120e6; // 5 minutes in microseconds
 
 uint64_t lastLoopTime=millis();
 
 
 //BATTERY CALC  SCALE over time.
-float highestVoltage=0;
-float lowestVoltage=100;
+float highestVoltage=0.0;
+float lowestVoltage=100.0;
 
 #define PI 3.14159
+
+
+
+//CODE
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v3";                       // Version 
+String BoardId = "windman.ktxcypress-300";   
+
+
+
+
+
+
+
+
 
 // REED SWITCH
 int switchPin=D6;
@@ -175,7 +202,7 @@ void WiFiStationConnected(WiFiEvent_t event, WiFiEventInfo_t info){
 
 void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.println("WiFi connected OTA");
-  Serial.println("IP address: ");
+  Serial.print ("IP address: ");
   Serial.println(WiFi.localIP());
   Serial.println("Version: " + Version);
 
@@ -191,12 +218,25 @@ void WiFiGotIP(WiFiEvent_t event, WiFiEventInfo_t info){
   // reason 0 on 1st status is ok
   line = String(BoardId + ".wifi.disreason value=" + String(DisconnectReason));
   toInflux(line);  
+
+ 
+  String ipAddressString = WiFi.localIP().toString();
+
     
-  
-  //line = String(BoardId + ".wifi.localip." + dot2dash(String(WiFi.localIP()))  + " value=" + String(DisconnectReason));
-  //toInflux(line);
+ 
+  //line = String(BoardId + ".wifi.localip, tag1=value1, ip_address=") + String(ipAddressString) + String(" ") + String(" value=10");
+
+  // line = String("testip,tag1=value1 ip_address=123 value=20") ;
+  // toInflux(line);
 
 }
+
+
+
+
+
+
+
 
 void logWifiStatus()
 {
@@ -238,6 +278,95 @@ void toInflux (String line)
       udp.endPacket();
 
 }
+
+
+
+//NVS FLASH
+// Function to write a float value to NVS flash
+esp_err_t writeNVSFloat(const char* var_name, float value) {
+  nvs_handle_t my_handle;
+  esp_err_t err;
+
+  // Open NVS handle
+  err = nvs_open("storage", NVS_READWRITE, &my_handle);
+  if (err != ESP_OK) {
+    return err;
+  }
+
+  // Write float to NVS
+  err = nvs_set_blob(my_handle, var_name, &value, sizeof(value));
+
+  // Commit updates and close handle
+  if (err == ESP_OK) {
+    err = nvs_commit(my_handle);
+  }
+  nvs_close(my_handle);
+
+  return err;
+}
+
+// Function to read a float value from NVS flash
+float readNVSFloat(const char* var_name) {
+  nvs_handle_t my_handle;
+  esp_err_t err;
+  float value = -1.0f;  // Default value in case of error
+
+  // Open NVS handle
+  err = nvs_open("storage", NVS_READONLY, &my_handle);
+  if (err != ESP_OK) {
+    return value;  // Return default value on error
+  }
+
+  // Read float from NVS
+  size_t data_size = sizeof(value);
+  err = nvs_get_blob(my_handle, var_name, &value, &data_size);
+
+  // Close handle
+  nvs_close(my_handle);
+
+  // Check for errors or data size mismatch
+  if (err != ESP_OK || data_size != sizeof(value)) {
+    return value;  // Return default value on error
+  }
+
+  return value;
+}
+
+
+void setupNVS() {
+  
+
+  // Initialize NVS flash
+  int err = nvs_flash_init();
+  if (err == ESP_ERR_NVS_NO_FREE_PAGES) {
+    // If no free pages, perform NVS erase (optional)
+    Serial.println("NVS flash full, erasing...");
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    err = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(err);  // Check for other errors
+
+  Serial.println("ESP32 NVS flash ready");
+
+  // Read initial battery level from NVS (optional)
+  highestVoltage = readNVSFloat("highestVoltage");
+  if (highestVoltage != -1.0f) {
+    Serial.println("highestVoltage Saved battery level: " + String(highestVoltage));
+  } else {
+    Serial.println("No highestVoltage battery level stored in NVS");
+  }
+
+  lowestVoltage = readNVSFloat("lowestVoltage");
+  if (lowestVoltage != -1.0f) {
+    Serial.print("lowestVoltage Saved battery level: "+ String(lowestVoltage));
+  } else {
+    Serial.println("No lowestVoltage battery level stored in NVS");
+  }
+
+
+}
+
+
 
 
 
@@ -317,8 +446,6 @@ void setupICP(){
 
 
 
-
-
 void setupAHT20(){
 
     uint8_t status;
@@ -346,12 +473,22 @@ float mapFloat(float x, float in_min, float in_max, float out_min, float out_max
 
 float logBatteryLevel() {
   // Read the battery voltage (assuming a 3.7V LiPo battery)
-  float voltage = analogRead(batteryPin) * (3.3 / 4095.0);  
+  float voltage = analogRead(batteryPin) * (3.26 / 4095.0);  
 
   //Serial.println("Voltage=" + String(voltage));
 
-  if (voltage > highestVoltage) {highestVoltage=voltage;}
-  if (voltage < lowestVoltage) {lowestVoltage=voltage;}
+
+  //UPDATE NVS with highest and lowest measured voltages
+
+  if (voltage > highestVoltage) {
+    highestVoltage=voltage;
+    writeNVSFloat("highestVoltage", highestVoltage);
+    }
+
+  if (voltage < lowestVoltage && voltage > 0) {
+    lowestVoltage=voltage;
+    writeNVSFloat("lowestVoltage", lowestVoltage);
+    }
 
   // Map the voltage to a percentage (replace with your specific battery curve if known)
   float percentage = mapFloat(voltage, lowestVoltage, highestVoltage, 0, 100);
@@ -362,6 +499,8 @@ float logBatteryLevel() {
 
   toInflux(BoardId + ".battery.level value=" + String(percentage));
   toInflux(BoardId + ".battery.voltage value=" + String(voltage));
+  toInflux(BoardId + ".battery.highestVoltage value=" + String(highestVoltage));
+  toInflux(BoardId + ".battery.lowestVoltage value=" + String(lowestVoltage));
 
 
 
@@ -675,6 +814,14 @@ void setup()
 
     Serial.begin(115200);
 
+    FastLED.addLeds<LED_TYPE, DATA_PIN>(leds, NUM_LEDS);     
+
+    pinMode(batteryPin, INPUT);   // READ BATTERY 
+
+    setupNVS();
+
+    //voltageReset();  //reset when needed.
+
 
     //WIFI SETUP  
     wifiSetup();
@@ -706,6 +853,13 @@ void setup()
     pinMode(bucketSwitchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
     attachInterrupt(digitalPinToInterrupt(bucketSwitchPin), tipping, FALLING); // Attach interrupt on falling edge
 
+
+
+  //works line = String("cpu_temp2,location=server_room,sensor_type=102.168.0.1 value=75") ;
+  
+  line = String(BoardId + ".wifi.ip" + ",ipaddress=" + WiFi.localIP().toString() + " value=75") ;
+
+  toInflux(line);
 
 }
 
@@ -756,6 +910,11 @@ void logRain(int tips, int elapsed) {
 
 }
 
+void voltageReset() {
+  writeNVSFloat("highestVoltage", 0);
+  writeNVSFloat("lowestVoltage", 100);
+}
+
 void OTAloop(){
 
      //OTA
@@ -773,9 +932,16 @@ void loop() {
   float newrps = reedRPS();
   float newtips = bucketTips();
 
+  
+
+  leds[0] = CRGB::Green;     //LED shows red light
+  FastLED.show();
+
   if (elapsed > 3000){
 
-    
+    leds[0] = CRGB::Blue;     // LED shows blue light
+    FastLED.show();
+
     //logTemperature();
     //logICPressure();
 
@@ -789,7 +955,6 @@ void loop() {
 
     lastLoopTime = millis();
     
-
   }
 
 }
