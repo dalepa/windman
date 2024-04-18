@@ -79,7 +79,7 @@ float lowestVoltage=100.0;
 
 
 //CODE
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v3";                       // Version 
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v3 LTR390_GAIN_1";                       // Version 
 String BoardId = "windman.ktxcypress-300";   
 
 
@@ -800,7 +800,7 @@ void logLTR390() {
          //Serial.print("UV Index: "); 
          //Serial.println(ltr390.getUVI());
          
-         ltr390.setGain(LTR390_GAIN_3);                   //Recommended for Lux - x3
+         ltr390.setGain(LTR390_GAIN_1);                   //Recommended for Lux - x3
          ltr390.setResolution(LTR390_RESOLUTION_18BIT);   //Recommended for Lux - 18-bit
          ltr390.setMode(LTR390_MODE_ALS);
       }
