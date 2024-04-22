@@ -80,7 +80,7 @@ float lowestVoltage=100.0;
 
 //CODE
 String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v3 LTR390_GAIN_1";                       // Version 
-String BoardId = "windman.ktxcypress-300";   
+String BoardId = "windman.ktxcypress-200";   
 
 
 
@@ -107,7 +107,7 @@ float tipsLastHour=0;
 float tipsLast24Hours=0;
 
 unsigned long  bucketLastTipTime = 0;
-const int debounceTime = 500; // Debounce time in milliseconds (adjust as needed)
+const int debounceTime = 400; // Debounce time in milliseconds (adjust as needed)
 
 int tipsLastMinuteTimer =0;
 int tipsLastLastHourTimer =0;
@@ -351,14 +351,14 @@ void setupNVS() {
   // Read initial battery level from NVS (optional)
   highestVoltage = readNVSFloat("highestVoltage");
   if (highestVoltage != -1.0f) {
-    Serial.println("highestVoltage Saved battery level: " + String(highestVoltage));
+    Serial.println("BATTERY: highestVoltage Saved battery level: " + String(highestVoltage));
   } else {
     Serial.println("No highestVoltage battery level stored in NVS");
   }
 
   lowestVoltage = readNVSFloat("lowestVoltage");
   if (lowestVoltage != -1.0f) {
-    Serial.print("lowestVoltage Saved battery level: "+ String(lowestVoltage));
+    Serial.println("BATTERY: lowestVoltage Saved battery level: "+ String(lowestVoltage));
   } else {
     Serial.println("No lowestVoltage battery level stored in NVS");
   }
@@ -489,6 +489,7 @@ float logBatteryLevel() {
     lowestVoltage=voltage;
     writeNVSFloat("lowestVoltage", lowestVoltage);
     }
+
 
   // Map the voltage to a percentage (replace with your specific battery curve if known)
   float percentage = mapFloat(voltage, lowestVoltage, highestVoltage, 0, 100);
@@ -640,8 +641,8 @@ void tipping() {
       tipsLastMinute++;
       tipsLastHour++; 
       tipsLast24Hours++;
-      //Serial.println("TIP");
-  }
+      //Serial.println("--------- TIP--------------");
+    }
 }
 
 
@@ -671,7 +672,7 @@ float calculateRainfall(float diameter_mm, float tips, float tip_volume_ml) {
   // Convert rainfall volume from cm³ to mm (millimeters of rain)
   float rainfall_mm = rainfall_volume / collector_area * 10;
 
-  return rainfall_mm / 25.4;
+  return rainfall_mm / 25.4;  // inches
 }
 
 
@@ -800,7 +801,13 @@ void logLTR390() {
          //Serial.print("UV Index: "); 
          //Serial.println(ltr390.getUVI());
          
-         ltr390.setGain(LTR390_GAIN_1);                   //Recommended for Lux - x3
+         //Switch back to LUX
+         if (ltr390.getLux() > 50000){
+            ltr390.setGain(LTR390_GAIN_1);
+         } else {
+            ltr390.setGain(LTR390_GAIN_3);
+         }
+                            //Recommended for Lux - x3
          ltr390.setResolution(LTR390_RESOLUTION_18BIT);   //Recommended for Lux - 18-bit
          ltr390.setMode(LTR390_MODE_ALS);
       }
@@ -818,7 +825,7 @@ void setup()
 
     pinMode(batteryPin, INPUT);   // READ BATTERY 
 
-    setupNVS();
+    
 
     //voltageReset();  //reset when needed.
 
@@ -853,7 +860,7 @@ void setup()
     pinMode(bucketSwitchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
     attachInterrupt(digitalPinToInterrupt(bucketSwitchPin), tipping, FALLING); // Attach interrupt on falling edge
 
-
+    setupNVS();
 
   //works line = String("cpu_temp2,location=server_room,sensor_type=102.168.0.1 value=75") ;
   
@@ -891,17 +898,20 @@ void logRain(int tips, int elapsed) {
 
     //Serial.printf("elapsed = %d\n", elapsed);   
 
-   
+    // Calibrated 60 tips = 1 in rain.   
 
-    rainfall = calculateRainfall(diameter,tipsLastMinute,bucketsize);
+    // rainfall = calculateRainfall(diameter,tipsLastMinute,bucketsize);
+    rainfall = tipsLastMinute/65;
     line = String(BoardId + ".rain.lastminute value=" + String(rainfall));
     toInflux(line);
 
-    rainfall = calculateRainfall(diameter,tipsLastHour,bucketsize);
+    //rainfall = calculateRainfall(diameter,tipsLastHour,bucketsize);
+    rainfall = tipsLastHour/65;
     line = String(BoardId + ".rain.lasthour value=" + String(rainfall));
     toInflux(line);
 
-    rainfall = calculateRainfall(diameter,tipsLast24Hours,bucketsize);
+    //rainfall = calculateRainfall(diameter,tipsLast24Hours,bucketsize);
+    rainfall = tipsLast24Hours/65;
     line = String(BoardId + ".rain.last24hours value=" + String(rainfall));
     toInflux(line);
 
