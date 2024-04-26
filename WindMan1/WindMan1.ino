@@ -3,6 +3,12 @@
 // Latest:  Adding NVS to store highest and lowest batterylevel after boot
 
 
+//AIR AirQualitySensor
+#include "DFRobot_AirQualitySensor.h"
+
+#define I2C_ADDRESS    0x19
+  DFRobot_AirQualitySensor particle(&Wire ,I2C_ADDRESS);
+
 
 //LED
 #include <FastLED.h>
@@ -79,7 +85,7 @@ float lowestVoltage=100.0;
 
 
 //CODE
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v3 LTR390_GAIN_1";                       // Version 
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v4 LTR390_GAIN_1 AIRQ";                       // Version 
 String BoardId = "windman.ktxcypress-200";   
 
 
@@ -802,11 +808,15 @@ void logLTR390() {
          //Serial.println(ltr390.getUVI());
          
          //Switch back to LUX
+         ltr390.setGain(LTR390_GAIN_1);
+         /*
          if (ltr390.getLux() > 50000){
             ltr390.setGain(LTR390_GAIN_1);
          } else {
             ltr390.setGain(LTR390_GAIN_3);
          }
+         */
+
                             //Recommended for Lux - x3
          ltr390.setResolution(LTR390_RESOLUTION_18BIT);   //Recommended for Lux - 18-bit
          ltr390.setMode(LTR390_MODE_ALS);
@@ -862,6 +872,8 @@ void setup()
 
     setupNVS();
 
+    AirQSetup();
+
   //works line = String("cpu_temp2,location=server_room,sensor_type=102.168.0.1 value=75") ;
   
   line = String(BoardId + ".wifi.ip" + ",ipaddress=" + WiFi.localIP().toString() + " value=75") ;
@@ -870,6 +882,71 @@ void setup()
 
 }
 
+void AirQSetup() {
+
+  /**
+  Sensor initialization is used to initialize IIC, which is determined by the communication mode used at this time.
+*/
+  if (!particle.begin())
+  {
+    Serial.println("AIR QUALITY SENSOR FAILED ");
+  }
+ 
+}
+
+void logAirQ(){
+
+/**
+ *@brief : Get particle number of 0.3um/0.5um/1.0um/2.5um/5.0um/10um per 0.1L of air
+ *@param :PARTICLENUM_0_3_UM_EVERY0_1L_AIR 
+          PARTICLENUM_0_5_UM_EVERY0_1L_AIR 
+          PARTICLENUM_1_0_UM_EVERY0_1L_AIR 
+          PARTICLENUM_2_5_UM_EVERY0_1L_AIR 
+          PARTICLENUM_5_0_UM_EVERY0_1L_AIR 
+          PARTICLENUM_10_UM_EVERY0_1L_AIR   
+*/  
+
+  uint16_t um0_3 = particle.gainParticleNum_Every0_1L(PARTICLENUM_0_3_UM_EVERY0_1L_AIR);
+  uint16_t um0_5= particle.gainParticleNum_Every0_1L(PARTICLENUM_0_5_UM_EVERY0_1L_AIR);
+  uint16_t um1_0= particle.gainParticleNum_Every0_1L(PARTICLENUM_1_0_UM_EVERY0_1L_AIR);
+  uint16_t um2_5= particle.gainParticleNum_Every0_1L(PARTICLENUM_2_5_UM_EVERY0_1L_AIR);
+  uint16_t um5_0= particle.gainParticleNum_Every0_1L(PARTICLENUM_5_0_UM_EVERY0_1L_AIR);
+  uint16_t um10= particle.gainParticleNum_Every0_1L(PARTICLENUM_10_UM_EVERY0_1L_AIR);
+
+  uint16_t PM2_5 = particle.gainParticleConcentration_ugm3(PARTICLE_PM2_5_STANDARD);
+  uint16_t PM1_0 = particle.gainParticleConcentration_ugm3(PARTICLE_PM1_0_STANDARD);
+  uint16_t PM10 = particle.gainParticleConcentration_ugm3(PARTICLE_PM10_STANDARD);
+
+
+
+  toInflux ( String(BoardId + ".airq0_1l.particle.um0_3 value=" + String(um0_3))  );
+  toInflux ( String(BoardId + ".airq0_1l.particle.um0_5 value=" + String(um0_5))  );
+  toInflux ( String(BoardId + ".airq0_1l.particle.um1_0 value=" + String(um1_0))  );
+  toInflux ( String(BoardId + ".airq0_1l.particle.um2_5 value=" + String(um2_5))  );
+  toInflux ( String(BoardId + ".airq0_1l.particle.um5_0 value=" + String(um5_0))  );
+  toInflux ( String(BoardId + ".airq0_1l.particle.um10_0 value=" + String(um10))  );
+
+  toInflux ( String(BoardId + ".airq.particle.PM2_5 value=" + String(PM2_5))  );
+  toInflux ( String(BoardId + ".airq.particle.PM1_0 value=" + String(PM1_0))  );
+  toInflux ( String(BoardId + ".airq.particle.PM10 value=" + String(PM10))  );
+
+/*
+  Serial.print("The number of particles with a diameter of 0.3um per 0.1 in lift-off is: ");
+  Serial.println(um0_3);
+   Serial.print("The number of particles with a diameter of 0.5um per 0.1 in lift-off is: ");
+  Serial.println(um0_5);
+   Serial.print("The number of particles with a diameter of 1.0um per 0.1 in lift-off is: ");
+  Serial.println(um1_0);
+   Serial.print("The number of particles with a diameter of 2.5um per 0.1 in lift-off is: ");
+  Serial.println(um2_5);
+   Serial.print("The number of particles with a diameter of 5.0um per 0.1 in lift-off is: ");
+  Serial.println(um5_0);
+    Serial.print("The number of particles with a diameter of 10um per 0.1 in lift-off is: ");
+  Serial.println(um10);
+  Serial.println("");
+*/
+
+}
 
 
 void logRain(int tips, int elapsed) {
@@ -960,6 +1037,7 @@ void loop() {
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
+    logAirQ();
 
     logWifiStatus();
 
