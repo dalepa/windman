@@ -3,11 +3,13 @@
 // Latest:  Adding NVS to store highest and lowest batterylevel after boot
 
 
-//AIR AirQualitySensor
+//AIR AirQualitySensor and EnvironmentalSensor
 #include "DFRobot_AirQualitySensor.h"
+#include "DFRobot_EnvironmentalSensor.h"
 
 #define I2C_ADDRESS    0x19
   DFRobot_AirQualitySensor particle(&Wire ,I2C_ADDRESS);
+  DFRobot_EnvironmentalSensor environment(SEN050X_DEFAULT_DEVICE_ADDRESS, /*pWire = */&Wire);
 
 
 //LED
@@ -85,7 +87,7 @@ float lowestVoltage=100.0;
 
 
 //CODE
-String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield LTR380-BME680-AS5600 2024-04-17 v4 LTR390_GAIN_1 AIRQ";                       // Version 
+String Version = "WindMan DFrobot Firebeetle 2 ESP32-E Gravity IO Shield Sen0501-AS5600 2024-04-25 v4 AIRQ";                       // Version 
 String BoardId = "windman.ktxcypress-200";   
 
 
@@ -251,6 +253,10 @@ void logWifiStatus()
 
   wifiUptime=millis()-wifiDowntime; 
   line = String(BoardId + ".wifi.uptime value=" + String(wifiUptime/1000));
+  toInflux(line);
+
+  line = String(BoardId + ".wifi.ip" + ",ipaddress=" + WiFi.localIP().toString() + " value=75") ;
+
   toInflux(line);
 
 }
@@ -851,12 +857,9 @@ void setup()
     otaSetup();
 
 
-    setupBME680();  // BME680  temp-hum-press-air
-
-    setupLTR390();  //LTR390 light and UV
-
+    //setupBME680();  // BME680  temp-hum-press-air
+    //setupLTR390();  //LTR390 light and UV
     //setupAHT20();  //setup TEMP sensor
-
     //setup Pressure Sensor
     //setupICP();
 
@@ -870,9 +873,13 @@ void setup()
     pinMode(bucketSwitchPin, INPUT_PULLUP); // Set the switch pin as input with internal pullup
     attachInterrupt(digitalPinToInterrupt(bucketSwitchPin), tipping, FALLING); // Attach interrupt on falling edge
 
+
+    setupAirQ();
+    setupSen0501();
+
     setupNVS();
 
-    AirQSetup();
+   
 
   //works line = String("cpu_temp2,location=server_room,sensor_type=102.168.0.1 value=75") ;
   
@@ -882,16 +889,36 @@ void setup()
 
 }
 
-void AirQSetup() {
+void setupAirQ() {
 
   /**
   Sensor initialization is used to initialize IIC, which is determined by the communication mode used at this time.
 */
   if (!particle.begin())
   {
-    Serial.println("AIR QUALITY SENSOR FAILED ");
+    Serial.println("DFROBOTAIR QUALITY SENSOR FAILED ");
   }
  
+}
+
+
+void setupSen0501(){
+
+  if(environment.begin() != 0){
+    Serial.println("DFROBOT environment sensor failes!!");
+  }
+
+}
+
+void logSen0501(){
+
+      toInflux ( String(BoardId + ".dfrobot.sen0501.temperature value=" + String(environment.getTemperature(TEMP_F)))  );
+      toInflux ( String(BoardId + ".dfrobot.sen0501.humidity value=" + String(environment.getHumidity()))  );
+      toInflux ( String(BoardId + ".dfrobot.sen0501.uvi value=" + String(environment.getUltravioletIntensity()))  );
+      toInflux ( String(BoardId + ".dfrobot.sen0501.lux value=" + String(environment.getLuminousIntensity()))  );
+      toInflux ( String(BoardId + ".dfrobot.sen0501.pressure value=" + String(environment.getAtmospherePressure(HPA)))  );
+      toInflux ( String(BoardId + ".dfrobot.sen0501.elevation value=" + String(environment.getElevation()))  );
+
 }
 
 void logAirQ(){
@@ -1024,7 +1051,7 @@ void loop() {
   leds[0] = CRGB::Green;     //LED shows red light
   FastLED.show();
 
-  if (elapsed > 3000){
+  if (elapsed > 5000){
 
     leds[0] = CRGB::Blue;     // LED shows blue light
     FastLED.show();
@@ -1032,12 +1059,15 @@ void loop() {
     //logTemperature();
     //logICPressure();
 
-    logBME680();
-    logLTR390();
+    //logBME680();
+    //logLTR390();
+
     logBatteryLevel();
     logWind(newrps);
     logRain(newtips,elapsed/1000);
+    
     logAirQ();
+    logSen0501();
 
     logWifiStatus();
 
